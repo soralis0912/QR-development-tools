@@ -36,5 +36,8 @@ npm run build   # dist/ に出力
 
 ## デプロイ
 
+> **注意:** ワークフローファイルは権限の都合で `docs/deploy.yml` に置いてあります。
+> `.github/workflows/deploy.yml` に移動（GitHub の Web UI で作成して内容を貼り付けても可）してください。
+
 `main` への push で GitHub Actions がテスト・ビルドし、GitHub Pages にデプロイします。
 初回はリポジトリの **Settings → Pages → Build and deployment → Source** を **GitHub Actions** に設定してください。
