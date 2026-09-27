@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="マスク・バージョン・誤り訂正・埋め草まで全部いじれる開発者向け QR コード生成＆解析ツール" />
+    <title>QR Dev Tools</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7'%3E%3Cpath d='M0 0h7v7H0zM1 1v5h5V1zM2 2h3v3H2z'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1><span class="logo" aria-hidden="true"></span>QR Dev Tools</h1>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="gen" aria-selected="true">生成</button>
+        <button role="tab" data-tab="read" aria-selected="false">読み取り・解析</button>
+      </nav>
+      <button id="theme-toggle" class="ghost" title="テーマ切替" aria-label="テーマ切替">◐</button>
+    </header>
+
+    <!-- ================= Generator ================= -->
+    <main id="tab-gen" class="tab-panel">
+      <section class="controls">
+        <details open>
+          <summary>データ</summary>
+          <div class="row">
+            <label class="inline"><input type="radio" name="seg-mode" value="auto" checked /> 自動</label>
+            <label class="inline"><input type="radio" name="seg-mode" value="manual" /> セグメント手動指定</label>
+          </div>
+          <div id="auto-input">
+            <textarea id="text" rows="4" spellcheck="false">https://example.com/</textarea>
+            <div class="row">
+              <label>バイトモード文字コード
+                <select id="auto-encoding">
+                  <option value="utf-8">UTF-8</option>
+                  <option value="shift_jis">Shift_JIS</option>
+                  <option value="iso-8859-1">ISO-8859-1</option>
+                  <option value="hex">16進 (生バイト)</option>
+                </select>
+              </label>
+              <label>ECI
+                <select id="auto-eci">
+                  <option value="">なし</option>
+                  <option value="26">26 (UTF-8)</option>
+                  <option value="20">20 (Shift_JIS)</option>
+                  <option value="3">3 (ISO-8859-1)</option>
+                </select>
+              </label>
+            </div>
+            <p class="hint">\n や \0 などのエスケープは <label class="inline"><input type="checkbox" id="unescape" /> 解釈する</label></p>
+          </div>
+          <div id="manual-input" hidden>
+            <div id="segments"></div>
+            <div class="row">
+              <button id="add-seg" class="small">＋ セグメント追加</button>
+            </div>
+          </div>
+        </details>
+
+        <details open>
+          <summary>シンボル</summary>
+          <div class="grid2">
+            <label>誤り訂正レベル
+              <select id="ec">
+                <option value="L">L (~7%)</option>
+                <option value="M" selected>M (~15%)</option>
+                <option value="Q">Q (~25%)</option>
+                <option value="H">H (~30%)</option>
+              </select>
+            </label>
+            <label class="inline self-end"><input type="checkbox" id="boost-ec" /> 収まる範囲で EC を上げる</label>
+            <label>バージョン
+              <select id="version"></select>
+            </label>
+            <label>最小バージョン (自動時)
+              <input type="number" id="min-version" min="1" max="40" value="1" />
+            </label>
+            <label>マスク
+              <select id="mask">
+                <option value="auto">自動 (最小ペナルティ)</option>
+                <option value="0">0: (i+j) mod 2</option>
+                <option value="1">1: i mod 2</option>
+                <option value="2">2: j mod 3</option>
+                <option value="3">3: (i+j) mod 3</option>
+                <option value="4">4: (i/2 + j/3) mod 2</option>
+                <option value="5">5: ij mod 2 + ij mod 3</option>
+                <option value="6">6: (ij mod 2 + ij mod 3) mod 2</option>
+                <option value="7">7: ((i+j) mod 2 + ij mod 3) mod 2</option>
+                <option value="none">なし (仕様外)</option>
+              </select>
+            </label>
+            <label id="mask-format-as-wrap" hidden>形式情報上のマスク番号
+              <input type="number" id="mask-format-as" min="0" max="7" value="0" />
+            </label>
+          </div>
+        </details>
+
+        <details>
+          <summary>終端・埋め草・終端後データ</summary>
+          <div class="grid2">
+            <label>終端パターン
+              <select id="terminator">
+                <option value="auto">標準 (最大 4bit)</option>
+                <option value="0">0 bit (省略)</option>
+                <option value="1">1 bit</option>
+                <option value="2">2 bit</option>
+                <option value="3">3 bit</option>
+                <option value="4">4 bit</option>
+                <option value="8">8 bit</option>
+              </select>
+            </label>
+            <label>埋め草コード語
+              <select id="padding">
+                <option value="standard">標準 (EC 11 交互)</option>
+                <option value="zeros">00 で埋める</option>
+                <option value="custom">カスタム</option>
+              </select>
+            </label>
+            <label id="custom-pad-wrap" hidden class="span2">カスタム埋め草 (16進, 繰り返し)
+              <input type="text" id="custom-pad" value="AA 55" spellcheck="false" />
+            </label>
+          </div>
+          <label>終端後に埋め込むデータ（通常のリーダーには見えない）
+            <textarea id="hidden-data" rows="2" spellcheck="false" placeholder="例: SECRET"></textarea>
+          </label>
+          <div class="row">
+            <label class="inline"><input type="radio" name="hidden-enc" value="utf-8" checked /> UTF-8</label>
+            <label class="inline"><input type="radio" name="hidden-enc" value="hex" /> 16進</label>
+          </div>
+        </details>
+
+        <details>
+          <summary>上級: 生データ・形式情報・エラー注入</summary>
+          <label>データコード語を直接指定 (16進, RS 符号化前) — 指定時はデータ入力を無視
+            <textarea id="raw-data" rows="2" spellcheck="false" placeholder="例: 40 C6 86 56 C6 C6 F0 EC 11 ..."></textarea>
+          </label>
+          <label>形式情報を上書き (15bit, 2進 or 0x16進)
+            <input type="text" id="format-override" placeholder="例: 101010000010010" spellcheck="false" />
+          </label>
+          <label>破損させるコード語番号 (インターリーブ後, カンマ区切り)
+            <input type="text" id="corrupt-cw" placeholder="例: 0, 3, 17" spellcheck="false" />
+          </label>
+          <div class="row">
+            <label>ランダム反転モジュール数 <input type="number" id="random-flips" min="0" value="0" /></label>
+            <button id="reseed" class="small">再抽選</button>
+          </div>
+          <p class="hint">プレビュー上のモジュールをクリックすると個別に反転できます（<span id="flip-count">0</span> 個）。<button id="clear-flips" class="link">クリア</button></p>
+        </details>
+
+        <details>
+          <summary>表示・出力</summary>
+          <div class="grid2">
+            <label>モジュールサイズ (px)
+              <input type="number" id="scale" min="1" max="40" value="8" />
+            </label>
+            <label>クワイエットゾーン (モジュール)
+              <input type="number" id="quiet" min="0" max="20" value="4" />
+            </label>
+            <label>前景色 <input type="color" id="fg" value="#000000" /></label>
+            <label>背景色 <input type="color" id="bg" value="#ffffff" /></label>
+          </div>
+        </details>
+      </section>
+
+      <section class="preview">
+        <div class="preview-head">
+          <div class="seg-control" id="overlay" role="radiogroup" aria-label="オーバーレイ">
+            <button data-v="none" aria-pressed="true">なし</button>
+            <button data-v="kind">機能パターン</button>
+            <button data-v="region">ビット列領域</button>
+            <button data-v="codeword">RS ブロック</button>
+            <button data-v="mask">マスク</button>
+          </div>
+          <label class="inline"><input type="checkbox" id="grid-lines" /> グリッド</label>
+        </div>
+        <div class="canvas-wrap"><canvas id="gen-canvas"></canvas></div>
+        <div id="legend" class="legend"></div>
+        <div class="row actions">
+          <button id="dl-png">PNG 保存</button>
+          <button id="dl-svg">SVG 保存</button>
+          <button id="copy-png">画像をコピー</button>
+          <button id="copy-ascii">テキストでコピー</button>
+          <button id="to-reader" class="primary">読み取りで検証 →</button>
+        </div>
+        <div id="gen-error" class="error" hidden></div>
+        <ul id="gen-warnings" class="warnings"></ul>
+      </section>
+
+      <section class="details" id="gen-details"></section>
+    </main>
+
+    <!-- ================= Reader ================= -->
+    <main id="tab-read" class="tab-panel" hidden>
+      <section class="controls">
+        <div id="drop" class="drop" tabindex="0">
+          <p><strong>画像をドロップ</strong> / クリックで選択 / Ctrl+V で貼り付け</p>
+          <input type="file" id="file" accept="image/*" hidden />
+        </div>
+        <div class="row">
+          <button id="camera-btn">カメラで読み取り</button>
+          <button id="camera-stop" hidden>停止</button>
+        </div>
+        <video id="video" playsinline muted hidden></video>
+        <details>
+          <summary>モジュール配列を直接入力</summary>
+          <p class="hint">1 行 1 列ずつ。暗 = <code>1 # █ X</code>、明 = <code>0 . 空白 _</code></p>
+          <textarea id="grid-input" rows="8" spellcheck="false"></textarea>
+          <button id="grid-decode" class="small">解析</button>
+        </details>
+        <div class="canvas-wrap src"><canvas id="src-canvas"></canvas></div>
+        <label id="cand-wrap" hidden>サンプリング候補
+          <select id="cand"></select>
+        </label>
+      </section>
+
+      <section class="preview">
+        <div class="preview-head">
+          <div class="seg-control" id="r-overlay" role="radiogroup" aria-label="オーバーレイ">
+            <button data-v="none">なし</button>
+            <button data-v="kind">機能パターン</button>
+            <button data-v="region" aria-pressed="true">ビット列領域</button>
+            <button data-v="codeword">RS ブロック</button>
+          </div>
+          <label class="inline"><input type="checkbox" id="r-unmasked" /> マスク解除後</label>
+        </div>
+        <div class="canvas-wrap"><canvas id="read-canvas"></canvas></div>
+        <div id="r-legend" class="legend"></div>
+      </section>
+
+      <section class="details" id="read-details">
+        <p class="empty">画像を読み込むとここに解析結果が表示されます。</p>
+      </section>
+    </main>
+
+    <footer>
+      <span>すべての処理はブラウザ内で完結します。</span>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
